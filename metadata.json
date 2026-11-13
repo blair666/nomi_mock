@@ -1,0 +1,6 @@
+{
+  "name": "AI Health Bestie",
+  "description": "Evidence-based women's health investigation assistant connecting personal symptoms, longitudinal lab trends, and curated medical research.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
