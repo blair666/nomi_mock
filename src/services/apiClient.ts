@@ -2,6 +2,9 @@ import type {
   DoctorSummaryData,
   EvidenceSource,
   PatientProfile,
+  PubMedExplanationResponse,
+  PubMedPaper,
+  PubMedSearchResponse,
   SignalExplanationResponse,
   TrendAnalysis,
   UrgentAlert,
@@ -18,6 +21,7 @@ export interface ChatApiResponse {
   referencedEvidenceIds: string[];
   urgentAlert: UrgentAlert;
   trend: TrendAnalysis | null;
+  demoMode?: boolean;
 }
 
 async function handleJsonResponse<T>(res: Response): Promise<T> {
@@ -41,6 +45,24 @@ export async function fetchCuratedEvidence(): Promise<{ evidence: EvidenceSource
   return handleJsonResponse<{ evidence: EvidenceSource[] }>(res);
 }
 
+export async function fetchPubMedResearch(query: string): Promise<PubMedSearchResponse> {
+  const params = new URLSearchParams({ query });
+  const res = await fetch(`/api/research?${params.toString()}`);
+  return handleJsonResponse<PubMedSearchResponse>(res);
+}
+
+export async function explainPubMedPaper(
+  paper: PubMedPaper,
+  topic?: string
+): Promise<PubMedExplanationResponse> {
+  const res = await fetch('/api/research/explain', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paper, topic }),
+  });
+  return handleJsonResponse<PubMedExplanationResponse>(res);
+}
+
 export async function analyzeSignals(
   patient: PatientProfile
 ): Promise<SignalExplanationResponse> {
@@ -54,12 +76,17 @@ export async function analyzeSignals(
 
 export async function sendHealthChat(params: {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  demoMode: boolean;
   patient: PatientProfile | null;
 }): Promise<ChatApiResponse> {
   const res = await fetch('/api/chat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
+    body: JSON.stringify({
+      messages: params.messages,
+      demoMode: params.demoMode,
+      patient: params.demoMode ? params.patient : null,
+    }),
   });
   return handleJsonResponse<ChatApiResponse>(res);
 }

@@ -13,6 +13,17 @@ async function startServer() {
 
   app.use(express.json({ limit: '1mb' }));
 
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(204);
+      return;
+    }
+    next();
+  });
+
   // Modular API routes
   app.use('/api', healthRouter);
 
@@ -32,7 +43,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`AI Health Bestie server running on http://0.0.0.0:${PORT}`);
+    console.log(`Nomi server running on http://0.0.0.0:${PORT}`);
   });
 }
 

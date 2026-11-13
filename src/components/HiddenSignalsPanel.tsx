@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import {
   Activity,
+  BellRing,
   ChevronRight,
   FileText,
   FlaskConical,
   HeartPulse,
+  HelpCircle,
   Loader2,
   Plus,
   RefreshCw,
@@ -22,6 +24,8 @@ interface HiddenSignalsPanelProps {
   explanationData: SignalExplanationResponse | null;
   isExplaining: boolean;
   explainError: string | null;
+  dueRemindersCount?: number;
+  onOpenReminders?: () => void;
   onRequestExplanation: () => void;
   onAddLabPoint: (year: number, value: number) => void;
   onLoadDemoPatient: () => void;
@@ -37,6 +41,8 @@ export const HiddenSignalsPanel: React.FC<HiddenSignalsPanelProps> = ({
   explanationData,
   isExplaining,
   explainError,
+  dueRemindersCount = 0,
+  onOpenReminders,
   onRequestExplanation,
   onAddLabPoint,
   onLoadDemoPatient,
@@ -46,6 +52,7 @@ export const HiddenSignalsPanel: React.FC<HiddenSignalsPanelProps> = ({
   const [filter, setFilter] = useState<TimelineFilter>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showChartAndInsight, setShowChartAndInsight] = useState(true);
+  const [showChallengeInsight, setShowChallengeInsight] = useState(false);
   const [newYear, setNewYear] = useState('2027');
   const [newValue, setNewValue] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -55,7 +62,7 @@ export const HiddenSignalsPanel: React.FC<HiddenSignalsPanelProps> = ({
       <div className="flex-1 flex flex-col px-6 pb-4 overflow-y-auto">
         <div>
           <h1 className="font-display text-3xl font-medium text-[#2E1E26] tracking-tight">
-            Hidden Signals
+            Timeline
           </h1>
           <p className="text-xs text-[#73636A] mt-1">Your health story over time.</p>
         </div>
@@ -69,13 +76,25 @@ export const HiddenSignalsPanel: React.FC<HiddenSignalsPanelProps> = ({
             Explore the 27-year-old synthetic record, longitudinal ferritin timeline (52 → 12 ng/mL),
             TypeScript slope calculation, and Gemini insight.
           </p>
-          <button
-            type="button"
-            onClick={onLoadDemoPatient}
-            className="min-h-[44px] px-5 py-2 rounded-full bg-[#4A2D3C] text-white text-xs font-medium hover:bg-[#3D2331] cursor-pointer"
-          >
-            Try Demo Patient
-          </button>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={onLoadDemoPatient}
+              className="min-h-[44px] px-5 py-2 rounded-full bg-[#4A2D3C] text-white text-xs font-medium hover:bg-[#3D2331] cursor-pointer"
+            >
+              Try Demo Patient
+            </button>
+            {onOpenReminders && (
+              <button
+                type="button"
+                onClick={onOpenReminders}
+                className="min-h-[44px] px-4 py-2 rounded-full bg-[#FAF5EF] border border-[#EAE2D8] text-[#2B1810] text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <BellRing className="w-3.5 h-3.5 text-[#B3534B]" />
+                <span>Checkups &amp; Meds ({dueRemindersCount} due)</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -134,7 +153,7 @@ export const HiddenSignalsPanel: React.FC<HiddenSignalsPanelProps> = ({
         <div className="flex items-start justify-between gap-2">
           <div>
             <h1 className="font-display text-3xl font-medium text-[#2E1E26] tracking-tight">
-              Hidden Signals
+              Timeline
             </h1>
             <p className="text-xs text-[#73636A] mt-1">Your health story over time.</p>
           </div>
@@ -179,6 +198,16 @@ export const HiddenSignalsPanel: React.FC<HiddenSignalsPanelProps> = ({
           >
             {showChartAndInsight ? 'Hide Trend Chart' : 'Show Trend Chart'}
           </button>
+          {onOpenReminders && (
+            <button
+              type="button"
+              onClick={onOpenReminders}
+              className="min-h-[36px] px-3.5 py-1 rounded-full text-xs font-medium bg-[#F7EBE8] text-[#2B1810] border border-[#F0DCD7] inline-flex items-center gap-1 cursor-pointer"
+            >
+              <BellRing className="w-3.5 h-3.5 text-[#B3534B]" />
+              <span>Checkups &amp; Rx ({dueRemindersCount})</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -188,15 +217,15 @@ export const HiddenSignalsPanel: React.FC<HiddenSignalsPanelProps> = ({
           <div className="space-y-3">
             {/* Compact 2-column TypeScript trend summary */}
             <div className="grid grid-cols-2 gap-2.5">
-              <div className="bg-white/80 rounded-2xl p-3 border border-[#ECE0D7] shadow-xs">
+              <div className="min-w-0 bg-white/80 rounded-2xl p-3 border border-[#ECE0D7] shadow-xs">
                 <p className="text-[11px] text-[#73636A]">Ferritin ({trend.startYear}–{trend.endYear})</p>
-                <p className="text-lg font-mono tabular-nums font-semibold text-[#A63838] mt-0.5">
+                <p className="text-base sm:text-lg font-mono tabular-nums font-semibold text-[#A63838] mt-0.5 break-words">
                   {trend.startValue} → {trend.latestValue} <span className="text-[11px] font-normal text-[#73636A]">ng/mL</span>
                 </p>
               </div>
-              <div className="bg-white/80 rounded-2xl p-3 border border-[#ECE0D7] shadow-xs">
+              <div className="min-w-0 bg-white/80 rounded-2xl p-3 border border-[#ECE0D7] shadow-xs">
                 <p className="text-[11px] text-[#73636A]">TypeScript Trend</p>
-                <p className="text-lg font-mono tabular-nums font-semibold text-[#4A2D3C] mt-0.5">
+                <p className="text-base sm:text-lg font-mono tabular-nums font-semibold text-[#4A2D3C] mt-0.5 break-words">
                   {trend.totalPercentChange}% <span className="text-[11px] font-normal text-[#73636A]">({trend.annualSlope}/yr)</span>
                 </p>
               </div>
@@ -280,6 +309,16 @@ export const HiddenSignalsPanel: React.FC<HiddenSignalsPanelProps> = ({
 
             <button
               type="button"
+              onClick={() => setShowChallengeInsight((prev) => !prev)}
+              aria-expanded={showChallengeInsight}
+              className="min-h-[40px] px-3.5 py-1.5 rounded-full border border-[#E3D1DD] bg-[#F5EDF2] text-xs font-medium text-[#4A2D3C] inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Challenge This Insight</span>
+            </button>
+
+            <button
+              type="button"
               onClick={onRequestExplanation}
               disabled={isExplaining}
               className="min-h-[40px] px-3.5 py-1.5 rounded-full bg-[#4A2D3C] text-white text-xs font-medium hover:bg-[#3D2331] disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer"
@@ -292,6 +331,24 @@ export const HiddenSignalsPanel: React.FC<HiddenSignalsPanelProps> = ({
               <span>{explanationData ? 'Refresh Gemini Insight' : 'Explain with Gemini'}</span>
             </button>
           </div>
+
+          {showChallengeInsight && (
+            <div className="rounded-2xl border border-[#E3D1DD] bg-white/90 p-4 space-y-2.5 text-xs shadow-xs">
+              <p className="font-semibold text-[#4A2D3C]">
+                Challenge This Insight · Uncertainties &amp; Missing Information
+              </p>
+              <p className="text-[#4A3B42] leading-relaxed">
+                A downward ferritin slope ({trend.annualSlope} ng/mL/yr) is a mathematical trend, not a
+                diagnosis. Ferritin is an acute-phase protein and can fluctuate with inflammation,
+                lab assay differences, or cycle timing.
+              </p>
+              <ul className="list-disc pl-4 space-y-1 text-[#4A3B42]">
+                {patient.missingContext.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {showAddForm && (
             <form

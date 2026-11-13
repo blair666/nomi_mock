@@ -15,7 +15,7 @@ const URGENT_SYMPTOM_PATTERNS: Array<{ label: string; regex: RegExp }> = [
 export function analyzeFerritinTrend(labs: LabResult[]): TrendAnalysis {
   const sorted = [...labs]
     .filter((item) => item.marker === 'Ferritin' && Number.isFinite(item.value))
-    .sort((a, b) => a.year - b.year);
+    .sort((a, b) => a.year - b.year || a.dateLabel.localeCompare(b.dateLabel));
 
   if (sorted.length === 0) {
     return {

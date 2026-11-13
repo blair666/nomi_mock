@@ -26,6 +26,7 @@ export interface PatientProfile {
   sexAssignedAtBirth: 'Female';
   lifeStage: string;
   primaryConcerns: string[];
+  wearables: string;
   symptoms: SymptomEntry[];
   labs: LabResult[];
   missingContext: string[];
@@ -74,6 +75,8 @@ export interface EvidenceSource {
   url: string;
   relevanceTag: string;
   keyFinding: string;
+  femaleRepresentation: string;
+  sexSpecificFindings: string;
   limitations: string;
   whatRemainsUnknown: string;
 }
@@ -110,3 +113,95 @@ export interface DoctorSummaryData {
   questionsForDoctor: string[];
   urgentGuidanceNote: string;
 }
+
+export interface PubMedPaper {
+  pmid: string;
+  title: string;
+  authors: string[];
+  journal: string;
+  fullJournalName: string;
+  pubDate: string;
+  publicationDetails: string;
+  publicationTypes: string[];
+  doi: string | null;
+  pubmedUrl: string;
+  isCachedFallback?: boolean;
+}
+
+export interface PubMedSearchResponse {
+  query: string;
+  sanitizedQuery: string;
+  source: 'pubmed-live' | 'memory-cache' | 'local-cache';
+  fallbackUsed: boolean;
+  totalFound: number;
+  papers: PubMedPaper[];
+  notice?: string;
+}
+
+export interface PubMedExplanationResponse {
+  pmid: string;
+  sourceSupported: string[];
+  uncertaintyAndGaps: string[];
+  summaryNote: string;
+  questionsForClinician: string[];
+}
+
+export type ReminderCategory =
+  | 'screening'
+  | 'imaging'
+  | 'checkup'
+  | 'medication'
+  | 'prescription';
+
+export type ReminderFrequency =
+  | 'Daily'
+  | 'Weekly'
+  | 'Monthly'
+  | 'Every 3 months'
+  | 'Every 6 months'
+  | 'Yearly'
+  | 'Every 3 years'
+  | 'As needed';
+
+export interface CareReminder {
+  id: string;
+  title: string;
+  category: ReminderCategory;
+  frequency: ReminderFrequency;
+  nextDueDate: string; // YYYY-MM-DD
+  timeOfDay?: string; // e.g., "08:00"
+  rationale: string;
+  whenAppropriate: string;
+  suggestedQuestion: string;
+  enabled: boolean;
+  lastCompletedDate?: string; // YYYY-MM-DD
+  isCustom?: boolean;
+  refillDaysLeft?: number;
+}
+
+export type CommunityTopic =
+  | 'Periods & Fatigue'
+  | 'Ferritin & Labs'
+  | 'Pap & Checkups'
+  | 'Ultrasound & Meds';
+
+export interface CommunityReply {
+  id: string;
+  author: string;
+  content: string;
+  createdAtLabel: string;
+}
+
+export interface CommunityPost {
+  id: string;
+  author: string;
+  topic: CommunityTopic;
+  question: string;
+  details: string;
+  createdAtLabel: string;
+  helpfulCount: number;
+  likedByMe?: boolean;
+  replies: CommunityReply[];
+  isSample?: boolean;
+}
+

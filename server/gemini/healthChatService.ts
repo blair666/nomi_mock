@@ -3,6 +3,8 @@ import type {
   ChatMessage,
   EvidenceSource,
   PatientProfile,
+  PubMedExplanationResponse,
+  PubMedPaper,
   TrendAnalysis,
 } from '../../src/shared/types.ts';
 import {
@@ -14,65 +16,84 @@ import {
 function buildInvestigationContextBlock(
   patient: PatientProfile | null,
   trend: TrendAnalysis | null,
-  evidence: EvidenceSource[]
+  evidence: EvidenceSource[],
+  demoMode: boolean
 ): string {
-  const patientSection = patient
-    ? JSON.stringify(
-        {
-          label: patient.label,
-          isSynthetic: patient.isSynthetic,
-          age: patient.age,
-          sexAssignedAtBirth: patient.sexAssignedAtBirth,
-          primaryConcerns: patient.primaryConcerns,
-          symptoms: patient.symptoms,
-          labs: patient.labs,
-          missingContext: patient.missingContext,
-        },
-        null,
-        2
-      )
-    : 'No patient profile is currently loaded. Encourage the user to click "Try Demo Patient" or describe general educational questions.';
+  const patientSection =
+    demoMode && patient
+      ? JSON.stringify(
+          {
+            id: patient.id,
+            label: 'Synthetic Demo Patient (fictional test record, NOT the user’s real personal labs)',
+            isSynthetic: patient.isSynthetic,
+            age: patient.age,
+            sexAssignedAtBirth: patient.sexAssignedAtBirth,
+            primaryConcerns: patient.primaryConcerns,
+            wearables: patient.wearables || 'none',
+            symptoms: patient.symptoms,
+            labs: patient.labs,
+            missingContext: patient.missingContext,
+          },
+          null,
+          2
+        )
+      : 'DEMO MODE: OFF. No synthetic demo patient or personal medical history is loaded. Only reference facts the user explicitly states in their own chat messages.';
 
-  const trendSection = trend
-    ? JSON.stringify(trend, null, 2)
-    : 'No lab trend has been calculated yet.';
+  const trendSection =
+    demoMode && trend
+      ? JSON.stringify(trend, null, 2)
+      : 'No lab trend is active (Demo Mode is OFF). Do NOT mention ferritin numbers or iron-depletion trends unless the user brings them up.';
 
   const evidenceSection = evidence
     .map(
       (item) =>
-        `- ${item.title} (${item.organizationOrJournal}, ${item.year})\n  Key Finding: ${item.keyFinding}\n  Limitations: ${item.limitations}\n  What Remains Unknown: ${item.whatRemainsUnknown}`
+        `- ID: ${item.id}\n  Title: ${item.title}\n  Source: ${item.organizationOrJournal} (${item.year})\n  URL: ${item.url}\n  Key Finding: ${item.keyFinding}\n  Female Representation: ${item.femaleRepresentation}\n  Sex-Specific Findings: ${item.sexSpecificFindings}\n  Limitations: ${item.limitations}\n  What Remains Unknown: ${item.whatRemainsUnknown}`
     )
     .join('\n');
 
   return `
-=== CURRENT PATIENT CONTEXT (SYNTHETIC / USER-PROVIDED SESSION DATA) ===
+=== SESSION DEMO MODE STATUS: ${demoMode ? 'ON (SYNTHETIC DEMO PATIENT)' : 'OFF (GENERAL USER CHAT)'} ===
 ${patientSection}
 
 === TYPESCRIPT-CALCULATED LAB TREND ANALYSIS ===
 ${trendSection}
 
-=== CURATED VERIFIABLE MEDICAL EVIDENCE (ONLY CITE THESE) ===
+=== CURATED VERIFIABLE MEDICAL EVIDENCE (ONLY CITE THESE EXACT IDs IF GENUINELY RELEVANT) ===
 ${evidenceSection}
 `.trim();
 }
 
 export async function generateHealthChatReply(params: {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  demoMode: boolean;
   patient: PatientProfile | null;
   trend: TrendAnalysis | null;
   evidence: EvidenceSource[];
 }): Promise<{ reply: string; referencedEvidenceIds: string[] }> {
   const ai = getGeminiClient();
+  const activePatient = params.demoMode ? params.patient : null;
+  const activeTrend = params.demoMode ? params.trend : null;
+
   const contextBlock = buildInvestigationContextBlock(
-    params.patient,
-    params.trend,
-    params.evidence
+    activePatient,
+    activeTrend,
+    params.evidence,
+    params.demoMode
   );
 
   const conversationTranscript = params.messages
     .slice(-12)
     .map((m) => `${m.role === 'user' ? 'User' : 'Nomi'}: ${m.content}`)
     .join('\n\n');
+
+  const groundingInstructions =
+    params.demoMode && activePatient
+      ? `- DEMO MODE IS ON (Synthetic Demo Patient ${activePatient.id}):
+  - Explicitly label any reference to the loaded profile as the **Synthetic Demo Patient** (for example: "In the Synthetic Demo Patient record (${activePatient.id})..."), clearly distinguishing that synthetic profile from whatever new symptom the user just shared in chat.
+  - Only bring up the demo ferritin trend (52 → 12 ng/mL) or heavy bleeding as context from the Synthetic Demo Patient when relevant, never claiming it is the user's real personal lab history.`
+      : `- DEMO MODE IS OFF:
+  - Do NOT mention ferritin values (52, 34, 21, 12, or 15 ng/mL), heavy menstrual bleeding, or any synthetic demo history unless the user explicitly mentions them in their own messages.
+  - Answer only based on what the user explicitly shared and general, non-diagnostic educational women's health literacy.`;
 
   const prompt = `
 ${contextBlock}
@@ -81,11 +102,18 @@ ${contextBlock}
 ${conversationTranscript}
 
 Respond to the user's latest message as Nomi.
-- Connect their question to the loaded symptoms, the TypeScript-calculated ferritin trend (if loaded), and the curated evidence sources above when relevant.
-- Explicitly mention relevant limitations or missing labs when interpreting patterns.
-- Keep your response concise, mobile-friendly, warm, and strictly non-diagnostic.
-- At the end, if helpful, suggest 1–2 practical questions they could ask their doctor.
+${groundingInstructions}
+
+CONVERSATIONAL QUALITY & FORMATTING RULES:
+- For brief or incomplete symptom messages (such as "Hi My period is irregular"), keep the response concise (around 70–130 words total):
+  1. Give a brief, warm, empathetic educational overview (no diagnosis, no treatment/prescriptions, and do NOT overwhelm with long lists of blood tests unless asked).
+  2. Ask **ONE** clear, helpful follow-up question about cycle timing, cycle length/variation, bleed duration, or missed periods.
+  3. Include brief urgent care awareness only when clinically appropriate without turning a greeting into an alarming list.
+- Format cleanly in standard GitHub-flavored Markdown (plain paragraphs, optional concise bullets). Never output raw HTML, raw <svg> tags, or backslash-escaped asterisks (\\*).
+- In "referencedEvidenceIds", include ONLY IDs from the curated evidence list above that directly support a statement in your reply. If the user asked about something not covered by those 3 sources (e.g., general irregular periods when Demo Mode is OFF), return an empty array [].
 `.trim();
+
+  const validIds = new Set(params.evidence.map((e) => e.id));
 
   const response = await ai.models.generateContent({
     model: GEMINI_MODEL,
@@ -93,28 +121,54 @@ Respond to the user's latest message as Nomi.
     config: {
       systemInstruction: HEALTH_BESTIE_SAFETY_CONSTITUTION,
       thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          reply: {
+            type: Type.STRING,
+            description:
+              'Concise, warm, mobile-friendly Markdown reply distinguishing user facts vs synthetic demo data (if Demo Mode is ON) and ending with ONE focused follow-up question.',
+          },
+          referencedEvidenceIds: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description:
+              'Exact IDs from the curated evidence dataset that were genuinely relevant to the reply, or [] if none apply.',
+          },
+        },
+        required: ['reply', 'referencedEvidenceIds'],
+      },
     },
   });
 
-  const replyText =
-    response.text?.trim() ||
-    'I could not generate a response right now. Please try asking again in a moment.';
+  const raw = (response.text ?? '{}').trim();
+  try {
+    const parsed = JSON.parse(raw) as {
+      reply?: string;
+      referencedEvidenceIds?: string[];
+    };
+    const replyText =
+      parsed.reply?.trim() ||
+      'I’d be glad to explore this with you. Could you share a bit more about how your cycle timing or duration has been changing recently?';
+    const filteredIds = Array.isArray(parsed.referencedEvidenceIds)
+      ? Array.from(
+          new Set(parsed.referencedEvidenceIds.filter((id) => validIds.has(id)))
+        )
+      : [];
 
-  const referencedEvidenceIds = params.evidence
-    .filter(
-      (ev) =>
-        replyText.toLowerCase().includes(ev.organizationOrJournal.toLowerCase().split(' ')[0]) ||
-        replyText.toLowerCase().includes(ev.id.toLowerCase()) ||
-        (ev.id === 'who-ferritin-2020' && /\bwho\b|15\s*ng\/ml/i.test(replyText)) ||
-        (ev.id === 'acog-hmb-guidance' && /\bacog\b|\bfigo\b|heavy menstrual/i.test(replyText)) ||
-        (ev.id === 'houston-bmjopen-2018' && /\bbmj\b|non-anemic|fatigue/i.test(replyText))
-    )
-    .map((ev) => ev.id);
-
-  return {
-    reply: replyText,
-    referencedEvidenceIds,
-  };
+    return {
+      reply: replyText,
+      referencedEvidenceIds: filteredIds,
+    };
+  } catch {
+    return {
+      reply:
+        raw ||
+        'I’d be glad to explore this with you. Could you share a bit more about how your cycle timing or duration has been changing recently?',
+      referencedEvidenceIds: [],
+    };
+  }
 }
 
 export async function explainLabSignalsWithGemini(params: {
@@ -126,7 +180,8 @@ export async function explainLabSignalsWithGemini(params: {
   const contextBlock = buildInvestigationContextBlock(
     params.patient,
     params.trend,
-    params.evidence
+    params.evidence,
+    true
   );
 
   const response = await ai.models.generateContent({
@@ -199,7 +254,8 @@ export async function synthesizeDoctorSummaryWithGemini(params: {
   const contextBlock = buildInvestigationContextBlock(
     params.patient,
     params.trend,
-    params.evidence
+    params.evidence,
+    true
   );
 
   const response = await ai.models.generateContent({
@@ -273,6 +329,135 @@ Task: Generate a structured, respectful, patient-ready Doctor Visit Summary grou
         'Would checking CRP/ESR, transferrin saturation, thyroid function (TSH), B12, or Vitamin D help clarify what is driving my fatigue?',
         'How should we evaluate the underlying reason for my heavy menstrual bleeding?',
         'What follow-up timeline and evidence-based options should we consider together?',
+      ],
+    };
+  }
+}
+
+export async function explainPubMedPaperWithGemini(params: {
+  paper: PubMedPaper;
+  topic?: string;
+}): Promise<PubMedExplanationResponse> {
+  const ai = getGeminiClient();
+
+  const metadataBlock = JSON.stringify(
+    {
+      pmid: params.paper.pmid,
+      title: params.paper.title,
+      authors: params.paper.authors,
+      journal: params.paper.fullJournalName || params.paper.journal,
+      pubDate: params.paper.pubDate,
+      publicationDetails: params.paper.publicationDetails,
+      publicationTypes: params.paper.publicationTypes,
+      pubmedUrl: params.paper.pubmedUrl,
+    },
+    null,
+    2
+  );
+
+  const response = await ai.models.generateContent({
+    model: GEMINI_MODEL,
+    contents: `
+=== RETRIEVED PUBMED ESUMMARY RECORD (BIBLIOGRAPHIC METADATA ONLY) ===
+${metadataBlock}
+
+General topic searched: ${(params.topic || 'women’s health, ferritin, and fatigue').trim()}
+
+Task:
+Help a patient understand what this specific PubMed record covers, STRICTLY separating:
+1. "sourceSupported": Facts directly visible in the retrieved PubMed ESummary metadata (title topic, publication year, journal, publication type like Systematic Review or Review, authors). Do NOT invent abstracts, sample sizes, female cohort percentages, p-values, or study outcomes.
+2. "uncertaintyAndGaps": What remains unknown from ESummary metadata alone (for example: full abstract and study text were not retrieved here, exact sample size, female participation percentage, ferritin cutoff definitions, effect sizes, and whether findings apply to an individual).
+3. "summaryNote": 1–2 plain-language non-diagnostic sentences framing how to read this title/type responsibly.
+4. "questionsForClinician": 2 concise, non-diagnostic questions to discuss with a doctor.
+`.trim(),
+    config: {
+      systemInstruction: HEALTH_BESTIE_SAFETY_CONSTITUTION,
+      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          sourceSupported: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: '2-3 statements strictly grounded in the retrieved PubMed ESummary metadata.',
+          },
+          uncertaintyAndGaps: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: '2-3 clear uncertainties, missing abstract details, or individual gaps.',
+          },
+          summaryNote: {
+            type: Type.STRING,
+            description: '1-2 concise educational sentences without diagnosis or fabricated findings.',
+          },
+          questionsForClinician: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: '2 practical questions for a clinician visit.',
+          },
+        },
+        required: [
+          'sourceSupported',
+          'uncertaintyAndGaps',
+          'summaryNote',
+          'questionsForClinician',
+        ],
+      },
+    },
+  });
+
+  const raw = (response.text ?? '{}').trim();
+  try {
+    const parsed = JSON.parse(raw) as Partial<PubMedExplanationResponse>;
+    return {
+      pmid: params.paper.pmid,
+      sourceSupported:
+        Array.isArray(parsed.sourceSupported) && parsed.sourceSupported.length > 0
+          ? parsed.sourceSupported.slice(0, 4)
+          : [
+              `Indexed in PubMed (PMID ${params.paper.pmid}) in ${params.paper.journal} (${params.paper.pubDate}).`,
+              `Title indicates focus on: "${params.paper.title}"${
+                params.paper.publicationTypes.length > 0
+                  ? ` (${params.paper.publicationTypes.join(', ')})`
+                  : ''
+              }.`,
+            ],
+      uncertaintyAndGaps:
+        Array.isArray(parsed.uncertaintyAndGaps) && parsed.uncertaintyAndGaps.length > 0
+          ? parsed.uncertaintyAndGaps.slice(0, 4)
+          : [
+              'NCBI ESummary returns bibliographic metadata only; the abstract, sample size, female cohort percentage, and statistical results were not retrieved.',
+              'Whether this paper applies to an individual depends on full-text review and clinical evaluation.',
+            ],
+      summaryNote:
+        parsed.summaryNote?.trim() ||
+        'This PubMed entry confirms the study topic and publication type; full outcomes require inspecting the linked PubMed abstract or full article.',
+      questionsForClinician:
+        Array.isArray(parsed.questionsForClinician) && parsed.questionsForClinician.length > 0
+          ? parsed.questionsForClinician.slice(0, 3)
+          : [
+              'How does this type of research apply—or not apply—to my specific symptoms and lab history?',
+              'What clinical guidelines or follow-up tests do you rely on when evaluating these concerns?',
+            ],
+    };
+  } catch {
+    return {
+      pmid: params.paper.pmid,
+      sourceSupported: [
+        `PubMed record PMID ${params.paper.pmid} published in ${params.paper.journal} (${params.paper.pubDate}).`,
+        `Publication type(s): ${
+          params.paper.publicationTypes.join(', ') || 'Journal Article'
+        }.`,
+      ],
+      uncertaintyAndGaps: [
+        'Abstract text, sample size, female cohort percentage, and numerical findings are not included in ESummary metadata.',
+        'Open the PubMed URL directly to review the full abstract and limitations before drawing conclusions.',
+      ],
+      summaryNote:
+        'Only verified bibliographic metadata was retrieved; avoid inferring study outcomes from a title alone.',
+      questionsForClinician: [
+        'Could we discuss how current medical guidelines interpret findings on this topic for my health context?',
       ],
     };
   }

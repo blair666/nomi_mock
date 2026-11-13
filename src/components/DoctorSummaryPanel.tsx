@@ -63,7 +63,7 @@ export const DoctorSummaryPanel: React.FC<DoctorSummaryPanelProps> = ({
     const lines = [
       'NOMI — PATIENT VISIT PREPARATION SUMMARY (EDUCATIONAL ONLY)',
       `Generated: ${new Date().toLocaleDateString()}`,
-      `Patient Context: ${patient.age}-year-old ${patient.sexAssignedAtBirth} (${patient.label})`,
+      `Patient Context: ${patient.id} · ${patient.age}-year-old ${patient.sexAssignedAtBirth} · Wearables: ${patient.wearables} (${patient.label})`,
       '',
       '1. OVERVIEW',
       summaryData?.visitOverview || trend.deterministicSummary,
@@ -177,9 +177,11 @@ export const DoctorSummaryPanel: React.FC<DoctorSummaryPanelProps> = ({
             </h3>
           </div>
           <div className="text-xs text-[#73636A] font-mono tabular-nums">
+            <span>{patient.id}</span>
+            <span aria-hidden="true"> · </span>
             <span>{patient.age}y {patient.sexAssignedAtBirth}</span>
             <span aria-hidden="true"> · </span>
-            <span>{patient.isSynthetic ? 'Synthetic Demo Record' : 'Session Record'}</span>
+            <span>Wearables: {patient.wearables}</span>
           </div>
         </header>
 

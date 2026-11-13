@@ -1,13 +1,15 @@
 import { Router } from 'express';
-import type { DoctorSummaryData, PatientProfile } from '../../src/shared/types.ts';
+import type { DoctorSummaryData, PatientProfile, PubMedPaper } from '../../src/shared/types.ts';
 import { analyzeFerritinTrend, detectUrgentSymptoms } from '../analysis/trendEngine.ts';
 import { CURATED_EVIDENCE, DEMO_PATIENT } from '../data/demoPatient.ts';
 import { formatGeminiError } from '../gemini/client.ts';
 import {
   explainLabSignalsWithGemini,
+  explainPubMedPaperWithGemini,
   generateHealthChatReply,
   synthesizeDoctorSummaryWithGemini,
 } from '../gemini/healthChatService.ts';
+import { searchPubMedResearch } from '../services/pubmedService.ts';
 
 export const healthRouter = Router();
 
@@ -26,6 +28,31 @@ healthRouter.get('/demo-patient', (_req, res) => {
 
 healthRouter.get('/evidence', (_req, res) => {
   res.json({ evidence: CURATED_EVIDENCE });
+});
+
+healthRouter.get('/research', async (req, res) => {
+  const rawQuery = typeof req.query.query === 'string' ? req.query.query : '';
+  const result = await searchPubMedResearch(rawQuery);
+  res.json(result);
+});
+
+healthRouter.post('/research/explain', async (req, res) => {
+  try {
+    const body = req.body as { paper?: PubMedPaper; topic?: string };
+    if (!body?.paper?.pmid || !body?.paper?.title) {
+      res.status(400).json({ error: 'Valid PubMed paper metadata is required.' });
+      return;
+    }
+
+    const explanation = await explainPubMedPaperWithGemini({
+      paper: body.paper,
+      topic: body.topic,
+    });
+    res.json(explanation);
+  } catch (error) {
+    const formatted = formatGeminiError(error);
+    res.status(formatted.status).json({ error: formatted.message });
+  }
 });
 
 healthRouter.post('/analyze-signals', async (req, res) => {
@@ -58,6 +85,7 @@ healthRouter.post('/chat', async (req, res) => {
   try {
     const body = req.body as {
       messages?: Array<{ role: 'user' | 'assistant'; content: string }>;
+      demoMode?: boolean;
       patient?: PatientProfile | null;
     };
 
@@ -69,12 +97,14 @@ healthRouter.post('/chat', async (req, res) => {
       return;
     }
 
-    const patient = body?.patient ?? null;
+    const demoMode = typeof body?.demoMode === 'boolean' ? body.demoMode : Boolean(body?.patient);
+    const patient = demoMode ? body?.patient ?? DEMO_PATIENT : null;
     const trend = patient ? analyzeFerritinTrend(patient.labs) : null;
     const urgentAlert = detectUrgentSymptoms(latestUserMsg);
 
     const result = await generateHealthChatReply({
       messages,
+      demoMode,
       patient,
       trend,
       evidence: CURATED_EVIDENCE,
@@ -85,6 +115,7 @@ healthRouter.post('/chat', async (req, res) => {
       referencedEvidenceIds: result.referencedEvidenceIds,
       urgentAlert,
       trend,
+      demoMode,
     });
   } catch (error) {
     const formatted = formatGeminiError(error);
