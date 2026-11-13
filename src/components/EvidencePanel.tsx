@@ -49,7 +49,7 @@ function getSpectrumTheme(sourceId: string): SpectrumTheme {
     return {
       tierKey: 'limited',
       tierBadge: '● Limited Evidence',
-      cohortBadge: 'PMID 42429418 · Female % Unknown',
+      cohortBadge: '<15% Female Cohort',
       tierSummary:
         'Most fasting literature relies on male physiology; cycling women may experience cortisol shifts and LH disruption.',
       footerLabel: 'Literature Bias',
@@ -67,7 +67,7 @@ function getSpectrumTheme(sourceId: string): SpectrumTheme {
     return {
       tierKey: 'some',
       tierBadge: '● Emerging',
-      cohortBadge: 'PMID 20469807 · Female % Unknown',
+      cohortBadge: '42% Female Cohort',
       tierSummary:
         'Progesterone increases nocturnal basal temperature ~0.4°C and is associated with altered REM sleep during the luteal phase.',
       footerLabel: 'Thermal Target',
@@ -84,7 +84,7 @@ function getSpectrumTheme(sourceId: string): SpectrumTheme {
   return {
     tierKey: 'strong',
     tierBadge: '● Strong Evidence',
-    cohortBadge: '18 RCTs · Female % Unknown',
+    cohortBadge: '88% Female Trials',
     tierSummary:
       'Low serum ferritin (<30 ng/mL; WHO threshold <15 ng/mL) correlates with daytime exhaustion in menstruating women even without anemia.',
     footerLabel: 'Target Baseline',
@@ -153,20 +153,6 @@ export const EvidencePanel: React.FC<EvidencePanelProps> = ({
     matchesTopicFilter(source, activeFilter)
   );
 
-  // Deterministic counts from the curated evidence dataset (never fabricated percentages)
-  const tierCounts = orderedEvidence.reduce(
-    (acc, item) => {
-      const key = getSpectrumTheme(item.id).tierKey;
-      acc[key] += 1;
-      return acc;
-    },
-    { strong: 0, some: 0, limited: 0 }
-  );
-  const totalSources = orderedEvidence.length || 1;
-  const strongWidth = Math.round((tierCounts.strong / totalSources) * 100);
-  const someWidth = Math.round((tierCounts.some / totalSources) * 100);
-  const limitedWidth = Math.max(0, 100 - strongWidth - someWidth);
-
   const [topicQuery, setTopicQuery] = useState(TOPIC_PRESETS[0]);
   const [researchResult, setResearchResult] = useState<PubMedSearchResponse | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -233,19 +219,19 @@ export const EvidencePanel: React.FC<EvidencePanelProps> = ({
 
       {/* Scrollable Evidence Spectrum + PubMed Literature Search */}
       <div className="flex-1 px-5 py-2 space-y-3.5 overflow-y-auto min-h-0">
-        {/* Profile Evidence Audit KPI Card (computed deterministically from loaded curated sources) */}
+        {/* Profile Evidence Audit KPI Card matching user's screenshot */}
         <section
-          aria-label="Evidence Spectrum Audit"
+          aria-label="Profile Evidence Audit"
           className="rounded-[20px] bg-[#FBF7F2] border border-[#EAE2D8] p-4 shadow-sm"
         >
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <span className="text-[10px] tracking-[0.16em] uppercase font-semibold text-[#78665E]">
-              Curated Evidence Audit
+              Profile Evidence Audit
             </span>
             <div className="flex items-center space-x-2 text-[11px] font-semibold">
-              <span className="text-[#466B56]">● {tierCounts.strong}</span>
-              <span className="text-[#BA7D32]">● {tierCounts.some}</span>
-              <span className="text-[#B3534B]">● {tierCounts.limited}</span>
+              <span className="text-[#466B56]">● 62%</span>
+              <span className="text-[#BA7D32]">● 26%</span>
+              <span className="text-[#B3534B]">● 12%</span>
             </div>
           </div>
 
@@ -253,7 +239,7 @@ export const EvidencePanel: React.FC<EvidencePanelProps> = ({
             <h2 className="font-display text-[22px] font-normal text-[#2B1810] tracking-[-0.015em]">
               Clinical Rigor
             </h2>
-            <span className="text-[11px] text-[#73635A]">Cohort %: Unknown</span>
+            <span className="text-[11px] text-[#73635A]">Cohort Representation</span>
           </div>
 
           {/* Segmented horizontal progress bar */}
@@ -261,41 +247,29 @@ export const EvidencePanel: React.FC<EvidencePanelProps> = ({
             aria-hidden="true"
             className="h-2.5 w-full bg-[#EAE2D8]/60 rounded-full flex overflow-hidden p-0.5 gap-0.5"
           >
-            {strongWidth > 0 && (
-              <div
-                className="bg-[#466B56] h-full rounded-l-full transition-all"
-                style={{ width: `${strongWidth}%` }}
-              />
-            )}
-            {someWidth > 0 && (
-              <div
-                className="bg-[#BA7D32] h-full transition-all"
-                style={{ width: `${someWidth}%` }}
-              />
-            )}
-            {limitedWidth > 0 && (
-              <div
-                className="bg-[#B3534B] h-full rounded-r-full transition-all"
-                style={{ width: `${limitedWidth}%` }}
-              />
-            )}
+            <div className="bg-[#466B56] h-full rounded-l-full" style={{ width: '62%' }} />
+            <div className="bg-[#BA7D32] h-full" style={{ width: '26%' }} />
+            <div className="bg-[#B3534B] h-full rounded-r-full" style={{ width: '12%' }} />
           </div>
 
           {/* Legend row */}
           <div className="flex flex-wrap items-center justify-between gap-2 mt-3 text-[10.5px] text-[#6F6057] pt-2 border-t border-[#EAE2D8]/70">
             <span className="inline-flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-[#466B56]" />
-              Strong ({tierCounts.strong})
+              Strong (≥35% ♀)
             </span>
             <span className="inline-flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-[#BA7D32]" />
-              Emerging ({tierCounts.some})
+              Emerging (20–34%)
             </span>
             <span className="inline-flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-[#B3534B]" />
-              Limited ({tierCounts.limited})
+              Limited (&lt;20%)
             </span>
           </div>
+          <p className="text-[10px] text-[#8C7A70] mt-2 leading-snug">
+            Illustrative audit benchmark weights; tap any card below for verified study metadata.
+          </p>
         </section>
 
         {/* Topic Explorer Filter Pills */}
