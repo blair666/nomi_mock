@@ -6,7 +6,6 @@ import {
   BookOpen,
   ExternalLink,
   FileText,
-  Loader2,
   Send,
   Sparkles,
 } from 'lucide-react';
@@ -128,7 +127,7 @@ export const HealthChatPanel: React.FC<HealthChatPanelProps> = ({
       <div className="px-5 sm:px-6 pb-2.5 flex items-end justify-between gap-2">
         <div className="min-w-0">
           <h1 className="font-display text-3xl font-medium text-[#2E1E26] tracking-tight">
-            Ask Nomi
+            Ask nomi
           </h1>
           <p className="text-xs text-[#73636A] mt-1">
             Ask, reflect, and get evidence-informed support.
@@ -434,8 +433,15 @@ export const HealthChatPanel: React.FC<HealthChatPanelProps> = ({
         )}
 
         {isLoading && (
-          <div className="flex items-center gap-2 text-xs text-[#4A2D3C] bg-white/85 border border-[#ECE0D8] rounded-2xl px-4 py-3 w-fit shadow-xs">
-            <Loader2 className="w-4 h-4 animate-spin" />
+          <div className="flex items-center gap-2.5 text-xs text-[#4A2D3C] bg-white/85 border border-[#ECE0D8] rounded-2xl px-4 py-3 w-fit shadow-xs">
+            <span className="w-5 h-5 rounded-full overflow-hidden shrink-0 animate-spin">
+              <img
+                src="/assets/aistudio/Gemini_Generated_Image_aeer09aeer09aeer_390edcb7.jpeg"
+                alt=""
+                aria-hidden="true"
+                className="w-full h-full object-cover scale-125"
+              />
+            </span>
             <span>Thinking with Gemini...</span>
           </div>
         )}

@@ -437,14 +437,22 @@ export default function App() {
             </div>
           </div>
 
-          {/* Centered Brand Mark matching nomiUI.png */}
+          {/* Centered Brand Mark */}
           <div className="text-center">
             <button
               type="button"
               onClick={() => handleTabChange('ask')}
-              className="font-display text-3xl font-medium text-[#2E1E26] tracking-tight cursor-pointer"
+              className="inline-flex items-center justify-center gap-2.5 font-display text-3xl font-medium text-[#2E1E26] tracking-tight cursor-pointer"
             >
-              Nomi
+              <span className="w-9 h-9 rounded-xl overflow-hidden shrink-0">
+                <img
+                  src="/assets/aistudio/Gemini_Generated_Image_aeer09aeer09aeer_390edcb7.jpeg"
+                  alt=""
+                  aria-hidden="true"
+                  className="w-full h-full object-cover scale-125"
+                />
+              </span>
+              <span className="leading-none">nomi</span>
             </button>
             <p className="text-[10px] tracking-[0.2em] font-medium text-[#7C6A72] uppercase mt-1">
               Your Women&apos;s Health AI Companion
